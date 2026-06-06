@@ -4,29 +4,29 @@ import Link from "next/link";
 import {
   ArrowRight, Download, Music, Sparkles, MessageSquare, FileText,
   FileEdit, LayoutTemplate, Image, ImageIcon, Zap, Shield,
-  Globe, Star, Play, Search, TrendingUp, CheckCircle, Smartphone,
-  Cpu, MousePointer2, Layers
+  Globe, Star, Play, Search, TrendingUp, Cpu,
 } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 const featuredTools = [
   { label: "Video Downloader", href: "/youtube-downloader", icon: Download, description: "Download YouTube videos in up to 4K quality instantly.", color: "#FF2D2D", badge: "Hot" },
   { label: "YouTube to MP3", href: "/youtube-to-mp3", icon: Music, description: "Extract high-quality 320kbps audio from any video.", color: "#FF6B35" },
-  { label: "AI Summarizer", href: "/youtube-summarizer", icon: Sparkles, description: "Get concise, intelligent summaries of long videos.", color: "#8B5CF6", badge: "AI" },
+  { label: "AI Summarizer", href: "/youtube-summarizer", icon: Sparkles, description: "Get concise intelligent summaries of long videos.", color: "#8B5CF6", badge: "AI" },
   { label: "PDF Chat", href: "/pdf-chat", icon: MessageSquare, description: "Interact with your PDF documents using advanced AI.", color: "#06B6D4" },
-  { label: "Transcript Extra", href: "/youtube-transcript", icon: FileText, description: "Instant transcription with timestamps and speaker detection.", color: "#10B981" },
-  { label: "Background Remover", href: "/bg-remover", icon: Image, description: "Pro-level background removal for images in one click.", color: "#FF2D2D", badge: "New" },
-  { label: "HEIC Converter", href: "/heic-converter", icon: ImageIcon, description: "Batch convert iPhone photos to high-quality JPG/PNG.", color: "#10B981" },
+  { label: "Transcript Extract", href: "/youtube-transcript", icon: FileText, description: "Instant transcription with timestamps.", color: "#10B981" },
+  { label: "Background Remover", href: "/bg-remover", icon: Image, description: "Pro-level background removal in one click.", color: "#FF2D2D", badge: "New" },
+  { label: "HEIC Converter", href: "/heic-converter", icon: ImageIcon, description: "Batch convert iPhone photos to JPG/PNG.", color: "#10B981" },
   { label: "Insight Cards", href: "/youtube-insight-card", icon: LayoutTemplate, description: "Generate beautiful visual cards for sharing insights.", color: "#EC4899" },
   { label: "PDF to Word", href: "/pdf-to-word", icon: FileEdit, description: "Pixel-perfect conversion from PDF to Word docs.", color: "#F59E0B" },
 ];
 
 const categories = [
-  { name: "YouTube Tools", count: 12, icon: Play },
-  { name: "AI Utilities", count: 8, icon: Sparkles },
-  { name: "PDF Suite", count: 15, icon: FileText },
-  { name: "Image Tools", count: 6, icon: Image },
+  { name: "YouTube Tools", count: 9, icon: Play },
+  { name: "AI Utilities", count: 3, icon: Sparkles },
+  { name: "PDF Suite", count: 5, icon: FileText },
+  { name: "Image Tools", count: 3, icon: Image },
 ];
 
 const testimonials = [
@@ -35,25 +35,25 @@ const testimonials = [
 ];
 
 export default function HomePage() {
-  const [scrolled, setScrolled] = useState(false);
   const [urlInput, setUrlInput] = useState("");
+  const router = useRouter();
 
-  useEffect(() => {
-    const handleScroll = () => setScrolled(window.scrollY > 50);
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
+  function handleGo() {
+    const dest = urlInput.trim()
+      ? `/youtube-downloader?url=${encodeURIComponent(urlInput.trim())}`
+      : "/youtube-downloader";
+    router.push(dest);
+  }
 
   return (
     <AppLayout>
       <div className="relative overflow-hidden">
-        {/* Abstract Background Decorations */}
         <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-red-600/10 rounded-full blur-[120px] pointer-events-none" />
         <div className="absolute top-1/2 right-1/4 w-[400px] h-[400px] bg-orange-600/5 rounded-full blur-[100px] pointer-events-none" />
 
         <div style={{ maxWidth: "1280px", margin: "0 auto", padding: "0 24px" }}>
 
-          {/* Hero Section */}
+          {/* ── Hero ── */}
           <section className="pt-24 pb-20 text-center relative z-10">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-8"
               style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", backdropFilter: "blur(10px)" }}>
@@ -63,19 +63,19 @@ export default function HomePage() {
 
             <h1 className="text-5xl md:text-7xl font-extrabold mb-6 tracking-tight leading-[1.1]"
               style={{ fontFamily: "'Sora', sans-serif" }}>
-              The Ultimate <span className="gradient-text">YouTube</span> & <br />
+              The Ultimate <span className="gradient-text">YouTube</span> &amp; <br />
               <span className="text-white">AI Utility Hub.</span>
             </h1>
 
             <p className="text-lg md:text-xl text-gray-400 max-w-2xl mx-auto mb-12 leading-relaxed">
-              Download, summarize, convert, and analyze YouTube videos and documents with pro-grade tools. Fast, free, and no sign-up required.
+              Download, summarize, convert, and analyze YouTube videos and documents with pro-grade tools. Fast, free, no sign-up required.
             </p>
 
-            {/* Premium Input Bar */}
+            {/* URL input bar */}
             <div className="max-w-3xl mx-auto mb-16 px-4">
               <div className="relative group">
-                <div className="absolute -inset-1 bg-gradient-to-r from-red-600 to-orange-600 rounded-[24px] blur opacity-25 group-hover:opacity-40 transition duration-1000 group-hover:duration-200"></div>
-                <div className="relative flex items-center bg-[#0D0D0D] border border-white/10 rounded-[20px] p-2 pr-2 shadow-2xl">
+                <div className="absolute -inset-1 bg-gradient-to-r from-red-600 to-orange-600 rounded-[24px] blur opacity-25 group-hover:opacity-40 transition duration-1000 group-hover:duration-200" />
+                <div className="relative flex items-center bg-[#0D0D0D] border border-white/10 rounded-[20px] p-2 shadow-2xl">
                   <div className="pl-5 pr-2">
                     <Search className="text-gray-500" size={20} />
                   </div>
@@ -83,22 +83,36 @@ export default function HomePage() {
                     type="text"
                     value={urlInput}
                     onChange={(e) => setUrlInput(e.target.value)}
-                    placeholder="Enter YouTube URL or search tools..."
+                    onKeyDown={(e) => e.key === "Enter" && handleGo()}
+                    placeholder="Paste a YouTube URL to get started…"
                     className="w-full bg-transparent border-none focus:ring-0 text-white text-lg py-4 placeholder:text-gray-600 outline-none"
                   />
-                  <Link href={`/youtube-downloader?url=${encodeURIComponent(urlInput)}`}
-                    className="btn-red hidden md:flex items-center gap-2 px-8 py-4 rounded-[14px] font-bold text-base">
+                  <button
+                    onClick={handleGo}
+                    className="btn-red hidden md:flex items-center gap-2 px-8 py-4 rounded-[14px] font-bold text-base"
+                    style={{ whiteSpace: "nowrap" }}
+                  >
                     Get Started <ArrowRight size={18} />
-                  </Link>
-                  <button className="md:hidden p-4 bg-red-600 rounded-xl text-white" title="Get Started">
+                  </button>
+                  <button
+                    onClick={handleGo}
+                    className="md:hidden p-4 bg-red-600 rounded-xl text-white flex items-center"
+                    title="Go"
+                  >
                     <ArrowRight size={20} />
                   </button>
                 </div>
               </div>
               <div className="flex flex-wrap justify-center items-center gap-3 mt-6">
-                <span className="text-xs font-medium text-gray-500">POPULAR:</span>
-                {["Summarizer", "MP3 Converter", "Background Remover", "PDF Chat"].map(tag => (
-                  <Link key={tag} href="#" className="text-xs px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-gray-400 hover:text-white hover:border-red-500/50 transition-all">
+                <span className="text-xs font-medium text-gray-500">TOOLS:</span>
+                {[
+                  ["AI Summarizer", "/youtube-summarizer"],
+                  ["MP3 Converter", "/youtube-to-mp3"],
+                  ["Background Remover", "/bg-remover"],
+                  ["PDF Chat", "/pdf-chat"],
+                ].map(([tag, href]) => (
+                  <Link key={tag} href={href}
+                    className="text-xs px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-gray-400 hover:text-white hover:border-red-500/50 transition-all">
                     {tag}
                   </Link>
                 ))}
@@ -106,7 +120,7 @@ export default function HomePage() {
             </div>
           </section>
 
-          {/* Featured Categories */}
+          {/* ── Categories ── */}
           <section className="mb-24">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {categories.map((cat) => {
@@ -124,7 +138,7 @@ export default function HomePage() {
             </div>
           </section>
 
-          {/* Main Tools Grid */}
+          {/* ── Tools Grid ── */}
           <section className="mb-32">
             <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-4">
               <div>
@@ -134,13 +148,12 @@ export default function HomePage() {
                 <div className="h-1.5 w-20 bg-gradient-to-r from-red-600 to-orange-600 rounded-full" />
               </div>
               <Link href="/youtube-downloader" className="group text-gray-400 flex items-center gap-2 hover:text-red-500 transition-colors">
-                Explore all 50+ tools
+                Explore all tools
                 <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-red-600/10 transition-colors">
                   <ArrowRight size={14} />
                 </div>
               </Link>
             </div>
-
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {featuredTools.map((tool, idx) => {
                 const Icon = tool.icon;
@@ -148,10 +161,9 @@ export default function HomePage() {
                   <Link key={idx} href={tool.href} className="glass-card group p-1 overflow-hidden transition-all hover:-translate-y-1">
                     <div className="p-6">
                       <div className="flex justify-between items-start mb-6">
-                        <div className="w-14 h-14 rounded-2xl flex items-center justify-center relative"
+                        <div className="w-14 h-14 rounded-2xl flex items-center justify-center"
                           style={{ background: `${tool.color}15`, border: `1px solid ${tool.color}25` }}>
                           <Icon size={26} style={{ color: tool.color }} />
-                          <div className="absolute -inset-2 bg-[white]/10 blur-xl opacity-0 group-hover:opacity-100 transition-opacity" />
                         </div>
                         {tool.badge && (
                           <span className="text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-md bg-white/5 border border-white/10 text-white">
@@ -160,9 +172,7 @@ export default function HomePage() {
                         )}
                       </div>
                       <h3 className="text-lg font-bold text-white mb-2 group-hover:text-red-500 transition-colors">{tool.label}</h3>
-                      <p className="text-sm text-gray-500 leading-relaxed mb-6">
-                        {tool.description}
-                      </p>
+                      <p className="text-sm text-gray-500 leading-relaxed mb-6">{tool.description}</p>
                       <div className="flex items-center text-xs font-bold text-gray-400 group-hover:text-white transition-colors">
                         LAUNCH TOOL <ArrowRight size={12} className="ml-2 group-hover:translate-x-1 transition-transform" />
                       </div>
@@ -173,7 +183,7 @@ export default function HomePage() {
             </div>
           </section>
 
-          {/* Stats & Trust */}
+          {/* ── Stats ── */}
           <section className="mb-32">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
               <div>
@@ -183,9 +193,9 @@ export default function HomePage() {
                 </h2>
                 <div className="space-y-6">
                   {[
-                    { title: "Military-Grade Security", desc: "All files are processed using AES-256 encryption and deleted within 24 hours.", icon: Shield },
-                    { title: "Lightning Fast API", desc: "Our global server network ensures your downloads and summaries happen in seconds.", icon: Zap },
-                    { title: "Cross-Platform Access", desc: "Use TubeKit Pro on any device — Mobile, Tablet, or Desktop.", icon: Globe },
+                    { title: "Privacy First", desc: "All files are processed locally and deleted immediately after download.", icon: Shield },
+                    { title: "Lightning Fast", desc: "Direct YouTube pipeline ensures your downloads happen in seconds.", icon: Zap },
+                    { title: "Cross-Platform", desc: "Use TubeKit Pro on any device — Mobile, Tablet, or Desktop.", icon: Globe },
                   ].map((item, i) => (
                     <div key={i} className="flex gap-5">
                       <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center">
@@ -218,14 +228,13 @@ export default function HomePage() {
                     </div>
                   </div>
                 </div>
-                {/* Decorative floating elements */}
                 <div className="absolute -top-6 -right-6 w-24 h-24 bg-red-600/30 rounded-full blur-2xl animate-pulse" />
                 <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-orange-600/20 rounded-full blur-3xl" />
               </div>
             </div>
           </section>
 
-          {/* Testimonials */}
+          {/* ── Testimonials ── */}
           <section className="pb-32">
             <div className="text-center mb-16">
               <h2 className="text-3xl font-bold text-white mb-4">What Our Users Say</h2>
@@ -243,9 +252,7 @@ export default function HomePage() {
                       <div className="text-xs text-gray-500">{t.role}</div>
                     </div>
                   </div>
-                  <p className="text-gray-400 italic leading-relaxed">
-                    "{t.content}"
-                  </p>
+                  <p className="text-gray-400 italic leading-relaxed">&ldquo;{t.content}&rdquo;</p>
                 </div>
               ))}
             </div>

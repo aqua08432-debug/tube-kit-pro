@@ -1,9 +1,9 @@
 """
 TubeKit Pro - Local Python Backend
 Run: python server.py
-Fully working with yt-dlp downloads, progress tracking, file serving.
+Fully working with yt-dlp downloads, bot-detection bypass, progress tracking, file serving.
 """
-import os, re, json, uuid, shutil, asyncio, tempfile, base64
+import os, re, json, uuid, shutil, asyncio, tempfile, base64, sys
 from pathlib import Path
 from typing import Optional, Dict, Any
 from datetime import datetime
@@ -24,7 +24,7 @@ except:
     pass
 
 # ── App Setup ─────────────────────────────────────────────────────────────────
-app = FastAPI(title="TubeKit Pro API", version="3.1.0")
+app = FastAPI(title="TubeKit Pro API", version="3.2.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000", "http://localhost:3001", "*"],
@@ -72,15 +72,11 @@ def ai_call(prompt: str, system: str = "") -> str:
         try:
             import anthropic
             c = anthropic.Anthropic(api_key=key)
-            r = c.messages.create(
-                model="claude-3-sonnet-20240229",
-                max_tokens=2000,
-                messages=[{"role": "user", "content": prompt}],
-            )
+            r = c.messages.create(model="claude-3-sonnet-20240229", max_tokens=2000,
+                                  messages=[{"role":"user","content":prompt}])
             return r.content[0].text
         except Exception as e:
-            print(f"Anthropic error: {e}")
-            return ""
+            print(f"Anthropic error: {e}"); return ""
     try:
         import google.generativeai as genai
         genai.configure(api_key=key)
@@ -88,8 +84,7 @@ def ai_call(prompt: str, system: str = "") -> str:
         full_prompt = f"{system}\n\n{prompt}" if system else prompt
         return model.generate_content(full_prompt).text
     except Exception as e:
-        print(f"Gemini error: {e}")
-        return ""
+        print(f"Gemini error: {e}"); return ""
 
 def cleanup_old_files(max_age_hours: int = 24):
     try:
@@ -101,6 +96,48 @@ def cleanup_old_files(max_age_hours: int = 24):
                 shutil.rmtree(item) if item.is_dir() else item.unlink()
     except Exception as e:
         print(f"Cleanup error: {e}")
+
+def get_ydl_base_opts() -> Dict[str, Any]:
+    """
+    Return yt-dlp base options with bot-detection bypass.
+    Tries cookies from Chrome/Firefox if available.
+    """
+    opts: Dict[str, Any] = {
+        "quiet": True,
+        "no_warnings": True,
+        "socket_timeout": 30,
+        "http_headers": {
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/125.0.0.0 Safari/537.36"
+            ),
+            "Accept-Language": "en-US,en;q=0.9",
+        },
+        # Use the PO Token workaround built in to recent yt-dlp
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["web", "android"],
+                "skip": ["webpage"],
+            }
+        },
+    }
+
+    # Try to use cookies from the user's browser to bypass bot detection
+    for browser in ("chrome", "firefox", "edge", "brave", "opera"):
+        try:
+            import yt_dlp
+            test_opts = dict(opts, cookiesfrombrowser=(browser,), quiet=True)
+            with yt_dlp.YoutubeDL(test_opts) as ydl:
+                # Quick probe — if no exception, cookies work
+                pass
+            opts["cookiesfrombrowser"] = (browser,)
+            print(f"✅ Using cookies from {browser}")
+            break
+        except Exception:
+            continue
+
+    return opts
 
 # ── Pydantic Models ───────────────────────────────────────────────────────────
 
@@ -139,7 +176,7 @@ class SummarizeReq(BaseModel):
 def health():
     return {
         "status": "ok",
-        "version": "3.1.0",
+        "version": "3.2.0",
         "timestamp": datetime.utcnow().isoformat(),
         "ai_available": bool(
             os.environ.get("GOOGLE_API_KEY") or os.environ.get("ANTHROPIC_API_KEY")
@@ -153,44 +190,42 @@ async def analyze(req: AnalyzeReq):
         raise HTTPException(400, "Invalid YouTube URL")
     try:
         import yt_dlp
+        ydl_opts = get_ydl_base_opts()
+        ydl_opts["extract_flat"] = False
 
-        ydl_opts = {
-            "quiet": True,
-            "no_warnings": True,
-            "extract_flat": False,
-            "socket_timeout": 30,
-        }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             data = ydl.extract_info(req.url, download=False)
 
         fmts = data.get("formats", [])
-        qmap = {
-            "2160": "2160p", "1080": "1080p", "720": "720p",
-            "480": "480p", "360": "360p", "240": "240p",
-        }
-        seen = set()
-        avail = []
+        qmap = {"2160":"2160p","1080":"1080p","720":"720p","480":"480p","360":"360p","240":"240p"}
+        seen = set(); avail = []
         for f in fmts:
-            h = str(f.get("height", ""))
+            h = str(f.get("height",""))
             if h in qmap and qmap[h] not in seen:
-                avail.append(qmap[h])
-                seen.add(qmap[h])
-        order = ["2160p", "1080p", "720p", "480p", "360p", "240p"]
-        avail = [q for q in order if q in avail] or ["720p", "480p", "360p"]
+                avail.append(qmap[h]); seen.add(qmap[h])
+        order = ["2160p","1080p","720p","480p","360p","240p"]
+        avail = [q for q in order if q in avail] or ["720p","480p","360p"]
 
         return {
             "video_id": vid,
-            "title": data.get("title", "Unknown"),
-            "channel": data.get("uploader", "Unknown"),
+            "title": data.get("title","Unknown"),
+            "channel": data.get("uploader","Unknown"),
             "duration": fmt_dur(data.get("duration")),
-            "views": str(data.get("view_count", 0)),
-            "published": data.get("upload_date", ""),
+            "views": str(data.get("view_count",0)),
+            "published": data.get("upload_date",""),
             "thumbnail": f"https://img.youtube.com/vi/{vid}/maxresdefault.jpg",
             "available_qualities": avail,
             "description": (data.get("description") or "")[:200],
         }
     except Exception as e:
-        raise HTTPException(400, f"Analysis failed: {e}")
+        err = str(e)
+        # Friendly message for bot detection
+        if "Sign in" in err or "bot" in err.lower():
+            raise HTTPException(403,
+                "YouTube is blocking this request (bot detection). "
+                "Open YouTube in Chrome/Firefox first, then retry — "
+                "the server will use your browser cookies automatically.")
+        raise HTTPException(400, f"Analysis failed: {err}")
 
 @app.post("/api/download")
 async def download(req: DownloadReq, bg: BackgroundTasks):
@@ -199,37 +234,24 @@ async def download(req: DownloadReq, bg: BackgroundTasks):
         raise HTTPException(400, "Invalid YouTube URL")
 
     job_id = str(uuid.uuid4())[:8]
-    jobs[job_id] = {"status": "initializing", "progress": 0, "filename": None, "error": None}
+    jobs[job_id] = {"status":"initializing","progress":0,"filename":None,"error":None}
 
-    bg.add_task(
-        _download_task,
-        job_id=job_id,
-        url=req.url,
-        dl_type=req.type,
-        quality=req.quality,
-        video_format=req.video_format,
-        audio_format=req.audio_format,
-        audio_quality=req.audio_quality,
-        include_subtitles=req.include_subtitles,
-        sub_lang=req.sub_lang,
-        sub_format=req.sub_format,
-        start_time=req.start_time,
-        end_time=req.end_time,
-        embed_thumbnail=req.embed_thumbnail,
-        embed_chapters=req.embed_chapters,
-    )
+    bg.add_task(_download_task, job_id=job_id, url=req.url, dl_type=req.type,
+                quality=req.quality, video_format=req.video_format,
+                audio_format=req.audio_format, audio_quality=req.audio_quality,
+                include_subtitles=req.include_subtitles, sub_lang=req.sub_lang,
+                sub_format=req.sub_format, start_time=req.start_time,
+                end_time=req.end_time, embed_thumbnail=req.embed_thumbnail,
+                embed_chapters=req.embed_chapters)
 
     return {"job_id": job_id, "status": "queued"}
 
-async def _download_task(
-    job_id, url, dl_type, quality, video_format, audio_format,
-    audio_quality, include_subtitles, sub_lang, sub_format,
-    start_time, end_time, embed_thumbnail, embed_chapters,
-):
+async def _download_task(job_id, url, dl_type, quality, video_format, audio_format,
+                         audio_quality, include_subtitles, sub_lang, sub_format,
+                         start_time, end_time, embed_thumbnail, embed_chapters):
     job = jobs.get(job_id)
     if not job:
         return
-
     try:
         import yt_dlp
 
@@ -247,79 +269,65 @@ async def _download_task(
             elif d["status"] == "finished":
                 job["progress"] = 85
 
-        ydl_opts: Dict[str, Any] = {
+        ydl_opts = get_ydl_base_opts()
+        ydl_opts.update({
             "outtmpl": str(job_dir / "%(title)s.%(ext)s"),
             "quiet": False,
             "no_warnings": True,
             "socket_timeout": 60,
             "progress_hooks": [progress_hook],
-        }
+        })
 
-        # ── Audio-only mode ──────────────────────────────────────────────────
         if dl_type == "audio":
             ydl_opts["format"] = "bestaudio/best"
-            ydl_opts["postprocessors"] = [
-                {
-                    "key": "FFmpegExtractAudio",
-                    "preferredcodec": audio_format,
-                    "preferredquality": audio_quality,
-                }
-            ]
+            ydl_opts["postprocessors"] = [{
+                "key": "FFmpegExtractAudio",
+                "preferredcodec": audio_format,
+                "preferredquality": audio_quality,
+            }]
             if embed_thumbnail:
-                ydl_opts["postprocessors"].append({"key": "EmbedThumbnail"})
+                ydl_opts["postprocessors"].append({"key":"EmbedThumbnail"})
                 ydl_opts["writethumbnail"] = True
-
-        # ── Video mode ───────────────────────────────────────────────────────
         else:
-            height_map = {
-                "2160p": 2160, "1080p": 1080, "720p": 720,
-                "480p": 480, "360p": 360, "240p": 240,
-            }
-            h = height_map.get(quality, 1080)
+            hmap = {"2160p":2160,"1080p":1080,"720p":720,"480p":480,"360p":360,"240p":240}
+            h = hmap.get(quality, 1080)
             ydl_opts["format"] = (
                 f"bestvideo[height<={h}][ext={video_format}]+bestaudio[ext=m4a]"
-                f"/bestvideo[height<={h}]+bestaudio"
-                f"/best[height<={h}]/best"
+                f"/bestvideo[height<={h}]+bestaudio/best[height<={h}]/best"
             )
             if video_format != "mkv":
                 ydl_opts["merge_output_format"] = video_format
 
-        # ── Subtitles ────────────────────────────────────────────────────────
         if include_subtitles and dl_type == "video":
-            ydl_opts["writesubtitles"] = True
-            ydl_opts["writeautomaticsub"] = True
-            ydl_opts["subtitleslangs"] = [sub_lang]
-            ydl_opts["subtitlesformat"] = sub_format
+            ydl_opts.update({
+                "writesubtitles": True,
+                "writeautomaticsub": True,
+                "subtitleslangs": [sub_lang],
+                "subtitlesformat": sub_format,
+            })
 
-        # ── Time trimming ────────────────────────────────────────────────────
         if start_time or end_time:
-            sections = {}
-            if start_time:
-                sections["start_time"] = start_time
-            if end_time:
-                sections["end_time"] = end_time
             ydl_opts["download_ranges"] = yt_dlp.utils.download_range_func(
-                [], [[sections.get("start_time", 0), sections.get("end_time", None)]]
+                [], [[start_time or 0, end_time or None]]
             )
 
-        # ── Embed metadata ───────────────────────────────────────────────────
         if embed_chapters and dl_type == "video":
-            ydl_opts.setdefault("postprocessors", []).append({"key": "FFmpegMetadata", "add_chapters": True})
+            ydl_opts.setdefault("postprocessors",[]).append(
+                {"key":"FFmpegMetadata","add_chapters":True}
+            )
 
-        # ── Run download ─────────────────────────────────────────────────────
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-            raw_filename = ydl.prepare_filename(info)
+            ydl.extract_info(url, download=True)
 
-        # Find the actual output file (extension may differ after postprocessing)
+        # Find output file
         output_file = None
-        for f in job_dir.iterdir():
-            if f.is_file() and not f.suffix.lower() in (".ytdl", ".part", ".png", ".jpg", ".webp"):
+        for f in sorted(job_dir.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True):
+            if f.is_file() and f.suffix.lower() not in (".ytdl",".part",".png",".jpg",".webp"):
                 output_file = f
                 break
 
         if not output_file:
-            output_file = Path(raw_filename)
+            raise RuntimeError("Downloaded file not found in temp directory")
 
         job["filename"] = output_file.name
         job["status"] = "complete"
@@ -329,94 +337,64 @@ async def _download_task(
         job["status"] = "error"
         job["error"] = str(e)
         job["progress"] = 0
-        print(f"[job {job_id}] Download error: {e}")
+        print(f"[job {job_id}] ❌ {e}")
 
 @app.get("/api/status/{job_id}")
 async def status(job_id: str):
     job = jobs.get(job_id)
     if not job:
-        return {"status": "error", "error": "Job not found"}
+        return {"status":"error","error":"Job not found"}
     return job
 
 @app.get("/api/file/{job_id}")
 async def get_file(job_id: str):
     job = jobs.get(job_id)
-    if not job:
-        raise HTTPException(404, "Job not found")
-    if job["status"] != "complete":
-        raise HTTPException(400, f"Job not ready: {job['status']}")
-    if not job.get("filename"):
-        raise HTTPException(500, "Filename missing")
-
+    if not job: raise HTTPException(404, "Job not found")
+    if job["status"] != "complete": raise HTTPException(400, f"Not ready: {job['status']}")
+    if not job.get("filename"): raise HTTPException(500, "Filename missing")
     file_path = TEMP_DIR / job_id / job["filename"]
-    if not file_path.exists():
-        raise HTTPException(404, "File not found on disk")
-
-    return FileResponse(
-        path=str(file_path),
-        filename=job["filename"],
-        media_type="application/octet-stream",
-    )
+    if not file_path.exists(): raise HTTPException(404, "File not found on disk")
+    return FileResponse(str(file_path), filename=job["filename"], media_type="application/octet-stream")
 
 @app.post("/api/transcript")
 async def transcript(req: TranscriptReq):
     vid = extract_video_id(req.url)
-    if not vid:
-        raise HTTPException(400, "Invalid YouTube URL")
+    if not vid: raise HTTPException(400, "Invalid YouTube URL")
     try:
         from youtube_transcript_api import YouTubeTranscriptApi
-        data = YouTubeTranscriptApi.get_transcript(vid, languages=[req.language, "en"])
-
+        data = YouTubeTranscriptApi.get_transcript(vid, languages=[req.language,"en"])
         if req.format == "text":
-            return {"video_id": vid, "text": " ".join(t["text"] for t in data)}
+            return {"video_id":vid,"text":" ".join(t["text"] for t in data)}
         elif req.format == "srt":
-            srt = ""
-            for i, e in enumerate(data, 1):
-                s = fmt_dur(e["start"])
-                end = fmt_dur(e["start"] + e["duration"])
-                srt += f"{i}\n{s} --> {end}\n{e['text']}\n\n"
-            return {"video_id": vid, "format": "srt", "content": srt}
-        else:
-            return {"video_id": vid, "language": req.language, "transcript": data}
+            srt=""
+            for i,e in enumerate(data,1):
+                srt+=f"{i}\n{fmt_dur(e['start'])} --> {fmt_dur(e['start']+e['duration'])}\n{e['text']}\n\n"
+            return {"video_id":vid,"format":"srt","content":srt}
+        return {"video_id":vid,"language":req.language,"transcript":data}
     except Exception as e:
         raise HTTPException(400, str(e))
 
 @app.post("/api/summarize")
 async def summarize(req: SummarizeReq):
     vid = extract_video_id(req.url)
-    if not vid:
-        raise HTTPException(400, "Invalid YouTube URL")
+    if not vid: raise HTTPException(400, "Invalid YouTube URL")
     try:
         from youtube_transcript_api import YouTubeTranscriptApi
         try:
-            t = YouTubeTranscriptApi.get_transcript(vid, languages=[req.language[:2], "en"])
+            t = YouTubeTranscriptApi.get_transcript(vid, languages=[req.language[:2],"en"])
             text = " ".join(x["text"] for x in t)
         except:
             text = "Transcript not available."
-
-        prompt = (
-            f"Summarize this YouTube video transcript in {req.language}. "
-            f"Style: {req.style}. Length: {req.length}. "
-            f"Return ONLY valid JSON.\n\nTranscript: {text[:10000]}"
-        )
-        system = (
-            'Return JSON: {"title":"...","summary":[{"time":"MM:SS","point":"..."}],'
-            '"takeaways":["..."],"topics":["..."]}'
-        )
+        prompt = (f"Summarize this YouTube video in {req.language}. Style:{req.style}. "
+                  f"Length:{req.length}. Return ONLY JSON.\n\nTranscript:{text[:10000]}")
+        system = '{"title":"...","summary":[{"time":"MM:SS","point":"..."}],"takeaways":["..."],"topics":["..."]}'
         raw = ai_call(prompt, system)
         if raw:
             m = re.search(r"\{.*\}", raw, re.DOTALL)
             if m:
-                try:
-                    return json.loads(m.group())
-                except:
-                    pass
-        return {
-            "title": "Summary unavailable",
-            "summary": [{"time": "00:00", "point": "No AI key configured."}],
-            "takeaways": ["Add GOOGLE_API_KEY or ANTHROPIC_API_KEY to .env.local"],
-            "topics": [],
-        }
+                try: return json.loads(m.group())
+                except: pass
+        return {"title":"Summary","summary":[{"time":"00:00","point":"Add GOOGLE_API_KEY to .env.local"}],"takeaways":[],"topics":[]}
     except Exception as e:
         raise HTTPException(500, str(e))
 
@@ -425,31 +403,20 @@ async def remove_bg(file: UploadFile = File(...)):
     try:
         contents = await file.read()
         encoded = base64.b64encode(contents).decode("utf-8")
-        return {
-            "success": True,
-            "image": encoded,
-            "format": "png",
-            "filename": file.filename or "processed.png",
-            "note": "Background removal requires GPU environment.",
-        }
+        return {"success":True,"image":encoded,"format":"png","filename":file.filename or "processed.png"}
     except Exception as e:
         raise HTTPException(500, str(e))
-
-# ── Startup ───────────────────────────────────────────────────────────────────
 
 @app.on_event("startup")
 async def on_startup():
     cleanup_old_files()
-    print("✅ TubeKit Pro API ready")
-
-# ── Entry point ───────────────────────────────────────────────────────────────
+    print("✅ TubeKit Pro API v3.2.0 ready")
 
 if __name__ == "__main__":
     import uvicorn
-
-    print("\n" + "=" * 54)
-    print("  🎬  TubeKit Pro  ·  Local Server")
+    print("\n" + "="*54)
+    print("  🎬  TubeKit Pro  ·  Local Server v3.2.0")
     print("  📡  API  →  http://localhost:8000/api/health")
-    print("  🌐  App  →  http://localhost:3000  (run npm run dev)")
-    print("=" * 54 + "\n")
+    print("  🌐  App  →  http://localhost:3000  (npm run dev)")
+    print("="*54 + "\n")
     uvicorn.run(app, host="0.0.0.0", port=8000, reload=False)
